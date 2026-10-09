@@ -8,8 +8,8 @@ main = "_worker.js"
 
 compatibility_date = "2025-11-04"
 
-# 保留 Cloudflare 侧手动设置的变量与 secret：
-# ADMIN 通过 `wrangler secret put ADMIN` 设置（不写在本文件里，避免密码进入仓库）
+# 保留 Cloudflare 控制台里手动设置的变量：
+# ADMIN（后台密码）只在控制台维护，不写在本文件里，避免密码进入公开仓库
 keep_vars = true
 
 # 保留 *.workers.dev 备用域名
