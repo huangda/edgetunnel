@@ -1,0 +1,102 @@
+name: 🔄 同步上游 edgetunnel 并部署
+
+# 每天自动拉取 cmliu/edgetunnel 的最新 _worker.js 并部署到 Cloudflare Worker「hhhh」
+on:
+  schedule:
+    # 20:00 UTC = 次日 04:00 北京时间
+    - cron: "0 20 * * *"
+  workflow_dispatch:
+    inputs:
+      force:
+        description: "上游没有更新时也强制重新部署"
+        type: boolean
+        default: false
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/sync-deploy.yml"
+      - "wrangler.toml"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: sync-deploy
+  cancel-in-progress: false
+
+jobs:
+  sync-deploy:
+    name: 同步并部署
+    runs-on: ubuntu-latest
+    env:
+      UPSTREAM_REPO: cmliu/edgetunnel
+      UPSTREAM_BRANCH: main
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+      WRANGLER_SEND_METRICS: "false"
+
+    steps:
+      - name: 检出仓库
+        uses: actions/checkout@v4
+
+      - name: 拉取上游最新 _worker.js
+        run: |
+          set -euo pipefail
+          url="https://raw.githubusercontent.com/${UPSTREAM_REPO}/${UPSTREAM_BRANCH}/_worker.js"
+          echo "下载 $url"
+          curl -fsSL --retry 5 --retry-all-errors --retry-delay 3 -o _worker.js.new "$url"
+          test -s _worker.js.new                     # 文件不能为空
+          grep -q 'export default' _worker.js.new    # 基本完整性校验
+
+          new_sha="$(sha256sum _worker.js.new | awk '{print $1}')"
+          old_sha="$(cat .upstream-sha256 2>/dev/null || echo none)"
+          echo "上游 sha256 : $new_sha"
+          echo "上次已部署 : $old_sha"
+
+          mv _worker.js.new _worker.js
+          echo "NEW_SHA=$new_sha" >> "$GITHUB_ENV"
+
+          force='${{ inputs.force }}'
+          if [ "$new_sha" = "$old_sha" ] && [ "$force" != "true" ]; then
+            echo "上游没有变化，本次跳过部署。"
+            echo "CHANGED=false" >> "$GITHUB_ENV"
+          else
+            echo "CHANGED=true" >> "$GITHUB_ENV"
+          fi
+
+      - name: 安装 Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: 部署到 Cloudflare Workers
+        if: env.CHANGED == 'true'
+        run: npx --yes wrangler@4 deploy
+
+      - name: 记录已部署版本
+        if: env.CHANGED == 'true'
+        run: |
+          set -euo pipefail
+          printf '%s\n' "$NEW_SHA" > .upstream-sha256
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add _worker.js .upstream-sha256
+          if git diff --cached --quiet; then
+            echo "没有需要提交的变更。"
+          else
+            git commit -m "chore(sync): ${UPSTREAM_REPO}@${NEW_SHA:0:8} [skip ci]"
+            git push
+          fi
+
+      - name: 输出结果
+        if: always()
+        run: |
+          {
+            echo "### 同步结果"
+            echo ""
+            echo "| 项目 | 值 |"
+            echo "| --- | --- |"
+            echo "| 上游 | \`${UPSTREAM_REPO}@${UPSTREAM_BRANCH}\` |"
+            echo "| _worker.js sha256 | \`${NEW_SHA:-未知}\` |"
+            echo "| 本次是否部署 | ${CHANGED:-未知} |"
+          } >> "$GITHUB_STEP_SUMMARY"
