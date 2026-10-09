@@ -30,8 +30,15 @@
 - 备用域名：`https://hhhh.huangda1995.workers.dev`
 - KV 绑定：`KV` → `b6f9573a44ea4a80bb7f0defdb7829db`
 - 变量：`HOST = dada2006.ccwu.cc`
-- `ADMIN`（后台密码）不写在仓库里，通过 `wrangler secret put ADMIN` 存在 Cloudflare 侧；
-  因为配置里有 `keep_vars = true`，CI 部署时会自动保留它。
+- `ADMIN`（后台密码）只在 Cloudflare 控制台维护：
+  Workers & Pages → hhhh → 设置 → 变量和密钥。**不要**写进仓库。
+  配置里的 `keep_vars = true` 会让每次 CI 部署自动保留控制台里的这个值。
+
+### 想改后台密码 / 订阅 token
+
+直接在 Cloudflare 控制台改 `ADMIN` 的值并保存，Worker 立即生效。
+注意代码里 UUID 和订阅 token 都是由 `ADMIN + KEY` 派生出来的，
+改完密码后订阅地址会变（旧订阅地址会失效），需要到 `/admin` 后台重新复制。
 
 ## 注意事项
 
