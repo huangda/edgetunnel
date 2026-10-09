@@ -26,8 +26,9 @@
 `wrangler.toml` 里定义了目标 Worker，和上游仓库自带的 `wrangler.toml` 不同，**不要**用上游的覆盖它：
 
 - Worker 名称：`hhhh`
-- 自定义域名：`dada2006.ccwu.cc`
-- 备用域名：`https://hhhh.huangda1995.workers.dev`
+- 自定义域名（主用）：`edt.hd1995.uno` —— 国内可直连，节点 SNI 也用它
+- 自定义域名（备用）：`dada2006.ccwu.cc` —— 国内直连会被拦，挂代理时可用
+- workers.dev 备用域名：`https://hhhh.huangda1995.workers.dev`（国内 DNS 被投毒，基本不可用）
 - KV 绑定：`KV` → `b6f9573a44ea4a80bb7f0defdb7829db`
 - 变量：`HOST = dada2006.ccwu.cc`
 - `ADMIN`（后台密码）只在 Cloudflare 控制台维护：
